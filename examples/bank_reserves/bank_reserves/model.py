@@ -12,6 +12,7 @@ Author of NetLogo code:
 
 import mesa
 import numpy as np
+from mesa.time import RandomActivation
 
 from .agents import Bank, Person
 
@@ -25,15 +26,14 @@ For details see batch_run.py in the same directory as run.py.
 
 def get_num_rich_agents(model):
     """return number of rich agents"""
-
-    rich_agents = [a for a in model.agents if a.savings > model.rich_threshold]
+    rich_agents = [a for a in model.schedule.agents if a.savings > model.rich_threshold]
     return len(rich_agents)
 
 
 def get_num_poor_agents(model):
     """return number of poor agents"""
 
-    poor_agents = [a for a in model.agents if a.loans > 10]
+    poor_agents = [a for a in model.schedule.agents if a.loans > 10]
     return len(poor_agents)
 
 
@@ -41,7 +41,7 @@ def get_num_mid_agents(model):
     """return number of middle class agents"""
 
     mid_agents = [
-        a for a in model.agents if a.loans < 10 and a.savings < model.rich_threshold
+        a for a in model.schedule.agents if a.loans < 10 and a.savings < model.rich_threshold
     ]
     return len(mid_agents)
 
@@ -49,7 +49,7 @@ def get_num_mid_agents(model):
 def get_total_savings(model):
     """sum of all agents' savings"""
 
-    agent_savings = [a.savings for a in model.agents]
+    agent_savings = [a.savings for a in model.schedule.agents]
     # return the sum of agents' savings
     return np.sum(agent_savings)
 
@@ -57,7 +57,7 @@ def get_total_savings(model):
 def get_total_wallets(model):
     """sum of amounts of all agents' wallets"""
 
-    agent_wallets = [a.wallet for a in model.agents]
+    agent_wallets = [a.wallet for a in model.schedule.agents]
     # return the sum of all agents' wallets
     return np.sum(agent_wallets)
 
@@ -73,7 +73,7 @@ def get_total_money(model):
 
 def get_total_loans(model):
     # list of amounts of all agents' loans
-    agent_loans = [a.loans for a in model.agents]
+    agent_loans = [a.loans for a in model.schedule.agents]
     # return sum of all agents' loans
     return np.sum(agent_loans)
 
@@ -138,21 +138,25 @@ class BankReserves(mesa.Model):
         # create a single bank for the model
         self.bank = Bank(self, self.reserve_percent)
 
+        #Add scheduler with random activation to simulate real time processes
+        self.schedule = RandomActivation(self)
         # create people for the model according to number of people set by user
-        for _ in range(self.init_people):
+        for _id in range(self.init_people):
             # set x, y coords randomly within the grid
             x = self.random.randrange(self.width)
             y = self.random.randrange(self.height)
-            p = Person(self, True, self.bank, self.rich_threshold)
+            #Pass unique id for each agent
+            p = Person(self, _id, True, self.bank, self.rich_threshold)
             # place the Person object on the grid at coordinates (x, y)
             self.grid.place_agent(p, (x, y))
-
+            #Add agent to scheduler
+            self.schedule.add(p)
         self.running = True
         self.datacollector.collect(self)
 
     def step(self):
-        # tell all the agents in the model to run their step function
-        self.agents.shuffle_do("step")
+        # Tell scheduler to run step in every agent triggered by random activation
+        self.schedule.step()
         # collect data
         self.datacollector.collect(self)
 
